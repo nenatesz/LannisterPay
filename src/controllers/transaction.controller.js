@@ -1,27 +1,15 @@
-const FeeConfigurationSpec = require("../models/fee.model");
-const Transaction = require("../models/transaction.model");
-// const _ = require("lodash");
-
-// IMPORT EXPRESS VALIDATOR AND CHECK FOR STRING 
-
+const db = require("../../db");
 
 const computeTransaction = async (req, res) => {
-    const feeConfig = await FeeConfigurationSpec.find({}).lean();
-    const feeArr = [...feeConfig]
+    // GET REQUEST PAYLOAD
     const transactionData = req.body;
-    // console.log(feeConfig);
-    let transaction = {};
+    console.log(transactionData);
     let appliedFeeValue;
-    let minArr;
     let ChargeAmount;
-    let getData;
+    let localeType;
+    let sql;
 
-    console.log('data', transactionData.PaymentEntity)
-
-/**
- * get feeLocale
- * 
- */ let localeType
+    // CHECK IF TRANSACTION IS LOCAL OR INTERNATIONAL
     if (transactionData.PaymentEntity.Country === transactionData.CurrencyCountry){
         localeType = "LOCL"
     }else{
@@ -29,91 +17,73 @@ const computeTransaction = async (req, res) => {
     }
 
     console.log("Locale", localeType)
-    const getTransactionData = await FeeConfigurationSpec.find({}).lean()
 
-    const max = getTransactionData.reduce((prev, curr) => {
-         return prev.WildcardLen > curr.WildcardLen ? prev : curr;
-         }, 0)
-         const maxLen = max.WildcardLen
-         console.log("MAX", max.WildcardLen)
+    // CONFIRM THAT THE TRANSACTION CURRENCY IS IN NAIRA OR ALL(*)
+    if(transactionData.Currency !== "NGN" && transactionData.Currency !== "*"){
+    return res.status(400).json({
+        errors: [
+            {
+                msg: "No fee configuration for USD transactions."
+            }
+        ],
+        });
+    }
 
-         if(transactionData.Currency !== "NGN" && transactionData.Currency !== "*"){
-            return res.status(400).json({
-                errors: [
-                    {
-                        msg: "No fee configuration for USD transactions."
-                    }
-                ],
-              });
-         }
+    // CHECK IF PAYMENT ENTITY TYPE IS A CREDIT-CARD OR DEBIT-CARD AND QUERY THE DATABASE ACCORDINGLY
+    if(transactionData.PaymentEntity.Type === "CREDIT-CARD" || transactionData.PaymentEntity.Type == "DEBIT-CARD"){
+    sql = `SELECT * FROM FeeConfigurationSpec WHERE (FeeCurrency = 'NGN' OR FeeCurrency = '*') AND (FeeLocale = ${"'"}${localeType}${"'"} OR FeeLocale = '*') AND (FeeEntity = ${"'"}${transactionData.PaymentEntity.Type}${"'"} OR FeeEntity = '*') AND ((EntityProperty = ${"'"}${transactionData.PaymentEntity.Brand}${"'"} OR EntityProperty = '*') OR (EntityProperty = ${"'"}${transactionData.PaymentEntity.Number}${"'"} OR EntityProperty = '*')) ORDER BY WildcardLen
+    LIMIT 1`
+    }else{
+    sql = `SELECT * FROM FeeConfigurationSpec WHERE (FeeCurrency = 'NGN' OR FeeCurrency = '*') AND (FeeLocale = ${"'"}${localeType}${"'"} OR FeeLocale = '*') AND (FeeEntity = ${"'"}${transactionData.PaymentEntity.Type}${"'"} OR FeeEntity = '*') AND ((EntityProperty = ${"'"}${transactionData.PaymentEntity.Issuer}${"'"} OR EntityProperty = '*') OR (EntityProperty = ${"'"}${transactionData.PaymentEntity.Number}${"'"} OR EntityProperty = '*')) ORDER BY WildcardLen
+    LIMIT 1`
+    }
 
-         if(transactionData.PaymentEntity.Type === "CREDIT-CARD" || transactionData.PaymentEntity.Type === "DEBIT-CARD"){
-             getData = await FeeConfigurationSpec.find({$or:  [{WildcardLen: maxLen}, {$and: [{EntityProperty: transactionData.PaymentEntity.Brand},{FeeLocale: localeType}, {FeeEntity: transactionData.PaymentEntity.Type}]}, 
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Number},{FeeLocale: localeType}, {FeeEntity: transactionData.PaymentEntity.Type}]}, 
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Brand},{FeeLocale: "*"}, {FeeEntity: transactionData.PaymentEntity.Type}]},
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Number},{FeeLocale: "*"}, {FeeEntity: transactionData.PaymentEntity.Type}]},
-                {$and: [{EntityProperty: "*"},{FeeLocale: localeType}, {FeeEntity: transactionData.PaymentEntity.Type}]},
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Brand},{FeeLocale: localeType}, {FeeEntity: "*"}]},
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Number},{FeeLocale: localeType}, {FeeEntity: "*"}]},
-                {$and: [{EntityProperty: "*"},{FeeLocale: "*"}, {FeeEntity: "*"}]},
-            ]})
-         }
-         else {
-            getData = await FeeConfigurationSpec.find({$or: [{WildcardLen: maxLen}, {$and: [{EntityProperty: transactionData.PaymentEntity.Brand},{FeeLocale: localeType}, {FeeEntity: transactionData.PaymentEntity.Type}]}, 
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Number},{FeeLocale: localeType}, {FeeEntity: transactionData.PaymentEntity.Type}]}, 
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Issuer},{FeeLocale: "*"}, {FeeEntity: transactionData.PaymentEntity.Type}]},
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Number},{FeeLocale: "*"}, {FeeEntity: transactionData.PaymentEntity.Type}]},
-                {$and: [{EntityProperty: "*"},{FeeLocale: localeType}, {FeeEntity: transactionData.PaymentEntity.Type}]},
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Issuer},{FeeLocale: localeType}, {FeeEntity: "*"}]},
-                {$and: [{EntityProperty: transactionData.PaymentEntity.Number},{FeeLocale: localeType}, {FeeEntity: "*"}]},
-                {$and: [{EntityProperty: "*"},{FeeLocale: "*"}, {FeeEntity: "*"}]},
-            ]})
-         }
-         
-         console.log(getData, 'DATA')
-         const getMin = getData.reduce((prev, curr) => {
-                       console.log("min")
-                        return prev.WildcardLen < curr.WildcardLen ? prev : curr;
-                }, 0)
-    console.log("getData", getData)
-    console.log("getMIN", getMin)
- 
-    // CALCULATE APPLICABLE FEE
-    if(getMin.FeeType === "FLAT_PERC"){
+    // QUERY THE DATABASE
+    db.all(sql, [], (err, rows) => {
+    if (err) {
+        throw err;
+    }
+    const rowObj = rows[0]
+    console.log(rowObj);
+    if(rowObj.FeeType === "FLAT_PERC"){
         console.log("FLAT_PERC");
-        const percent = getMin.FeeValue[1].value
-        const value = getMin.FeeValue[0].value
+        const percent = rowObj.PercentValue
+        const value = rowObj.FlatValue
         console.log(percent, value);
         // 140 + ((1.4 / 100) * 1500)
-        appliedFeeValue = ((value) + ((percent) / 100) * (transactionData.Amount));
+        appliedFeeValue = Math.round((value) + ((percent) / 100) * parseFloat(transactionData.Amount));
         console.log('flat_perc', appliedFeeValue)
     }
-    else if (getMin.FeeType === "FLAT"){
-        const value = getMin.FeeValue[0].value
+    else if (rowObj.FeeType === "FLAT"){
+        const value = rowObj.FlatValue
         appliedFeeValue = value;
         console.log('flat', appliedFeeValue)
     }
-    else if (getMin.FeeType === "PERC"){
-        const percent = getMin.FeeValue[0].value
+    else if (rowObj.FeeType === "PERC"){
+        const percent = rowObj.PercentValue
         // ((fee value * transaction amount ) / 100)
-        appliedFeeValue = ((percent * transactionData.Amount) / 100)
+        appliedFeeValue = Math.round((percent * parseFloat(transactionData.Amount)) / 100)
         console.log('perc', appliedFeeValue);
     }
     
     if(transactionData.Customer.BearsFee === true){
-         ChargeAmount = transactionData.Amount + appliedFeeValue;
+            ChargeAmount = Math.round((parseFloat(transactionData.Amount) + appliedFeeValue));
     }else{
-         ChargeAmount = transactionData.Amount
+            ChargeAmount = Math.round(parseFloat(transactionData.Amount))
     }
 
     const SettlementAmount = ChargeAmount - appliedFeeValue
 
-    res.status(200).json({
-        AppliedFeeID: getMin.FeeID,
+    // RETURN SUCCESS RESPONSE
+    return res.status(200).json({
+        AppliedFeeID: rowObj.FeeID,
         AppliedFeeValue: appliedFeeValue,
         ChargeAmount: ChargeAmount,
         SettlementAmount: SettlementAmount
     })
+
+    });
+
 };
 
 module.exports = computeTransaction;
