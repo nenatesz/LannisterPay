@@ -11,6 +11,4 @@ router.post("/fee", feeConfigurationSpec);
 router.post("/compute-transaction-fee", postValidationRule(), computeTransaction)
 
 
-
-
 module.exports = router;

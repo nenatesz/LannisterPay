@@ -4,15 +4,13 @@ const morgan = require("morgan");
 const router = require("./src/routes/fee.route")
 require('dotenv').config();
 
-
-
-
 // EXPRESS SETUP
 const app = express();
 app.use(express.json());
 
 // LOG OUTPUTS
 app.use(morgan('combined'));
+
 app.use(cors());
 
 

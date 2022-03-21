@@ -8,10 +8,9 @@ const postValidationRule = () => [
     body('Customer.BearsFee').not().isEmpty().isBoolean().withMessage("The BearsFee should be a true or false"),
     body('PaymentEntity.Issuer').isString().withMessage("The Issuer should be a string"),
     body('PaymentEntity.Brand').isString().withMessage("The Brand should be a string"),
-    body('PaymentEntity.Number').isString().withMessage("The Brand should be a string"),
+    body('PaymentEntity.Number').isString().withMessage("The Number should be a string"),
     body('PaymentEntity.Type').not().isEmpty().isString().withMessage("The Type should be a string"),
-    body('PaymentEntity.Country').not().isEmpty().isString().withMessage("The Country should be a string"),
-    // body('PaymentEntity.SixID').isString().withMessage("please select a mood"),
+    body('PaymentEntity.Country').not().isEmpty().isString().withMessage("The Country should be a string"),    
     validate,
 ]
 
