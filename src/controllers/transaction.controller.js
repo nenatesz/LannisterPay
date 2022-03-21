@@ -89,7 +89,7 @@ const computeTransaction = async (req, res) => {
             AppliedFeeID: rowObj.FeeID,
             AppliedFeeValue: appliedFeeValue,
             ChargeAmount: ChargeAmount,
-            SettlementAmount: SettlementAmount
+            SettlementAmount: SettlementAmount           
         }, responseTime: timeDifference})
         });
 }catch(error){
