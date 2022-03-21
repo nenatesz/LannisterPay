@@ -3,8 +3,8 @@ An API service for a fictional payment processor (LannisterPay)
 
 The API supports the functionalities below:
 
- Fee configuration creation (POST /fee)
- compute the fee applicable to the transaction based on the stored configuration (/POST compute-transaction-fee)
+ Fee configuration creation (POST /fee)  
+ compute the fee applicable to the transaction based on the stored configuration (/POST compute-transaction-fee)  
 
 # Tools and Technology
 node (Version 14.18.1)  
